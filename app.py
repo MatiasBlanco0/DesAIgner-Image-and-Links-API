@@ -7,6 +7,8 @@ import numpy as np
 from clip_interrogator import Config, Interrogator
 from groundingdino.util.inference import Model
 
+CONFIDENCE_THRESHOLD = 0.5
+
 MODEL_CONFIG_PATH = "./GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 MODEL_CHECKPOINT_PATH = "./GroundingDINO/weights/groundingdino_swint_ogc.pth"
 model = Model(MODEL_CONFIG_PATH, MODEL_CHECKPOINT_PATH, "cpu")
@@ -30,16 +32,25 @@ def post():
   img_source = np.asarray(img)
   detections = get_detections(img_source)
 
+  furnitures = []
+
+  for detection in detections:
+    furnitures.append(img.crop(detection["xyxy"]))
+
   return sorted(detections, key=area)
 
 
 def get_detections(img):
   detections = model.predict_with_classes(img, CLASSES, BOX_THRESHOLD, TEXT_THRESHOLD)
-  return parse_detections(detections)
+  filter_function = lambda detection: detection["confidence"] > CONFIDENCE_THRESHOLD
+  return list(filter(filter_function, parse_detections(detections)))
 
 def parse_detections(detections):
   output = []
   for xyxy, confidence, class_id in zip(detections.xyxy, detections.confidence, detections.class_id):
+    xyxy = list(map(float, xyxy))
+    confidence = float(confidence)
+    class_id = int(class_id) if class_id else None
     output.append({
         "xyxy": xyxy,
         "confidence": confidence,
