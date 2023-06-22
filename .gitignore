@@ -1,5 +1,7 @@
 .venv/
 __pycache__/
+cache/
 GroundingDINO/
+ViT-L-14/
 
 *.jpg
