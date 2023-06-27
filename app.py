@@ -26,6 +26,7 @@ print(f"{GREEN_COLOR}GroundingDINO model loaded{END_COLOR}")
 CAPTION_MODEL_NAME = "blip-large"
 CAPTION_MODEL_PATH = "ViT-L-14/openai"
 config = Config(caption_model_name=CAPTION_MODEL_NAME, clip_model_path=CAPTION_MODEL_PATH, device="cpu")
+config.apply_low_vram_defaults()
 clip_interrogator = Interrogator(config)
 
 print(f"{GREEN_COLOR}CLIP interrogator model loaded{END_COLOR}")
