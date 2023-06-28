@@ -4,7 +4,7 @@ import re
 import base64
 from PIL import Image
 import numpy as np
-from clip_interrogator import Config, Interrogator
+from transformers import BlipProcessor, BlipForConditionalGeneration
 from groundingdino.util.inference import Model
 
 GREEN_COLOR = "\033[92m"
@@ -15,21 +15,18 @@ CONFIDENCE_THRESHOLD = 0.5
 # GroundingDINO configuration
 MODEL_CONFIG_PATH = "./GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 MODEL_CHECKPOINT_PATH = "./GroundingDINO/weights/groundingdino_swint_ogc.pth"
-model = Model(MODEL_CONFIG_PATH, MODEL_CHECKPOINT_PATH, "cpu")
+DINO_model = Model(MODEL_CONFIG_PATH, MODEL_CHECKPOINT_PATH, "cpu")
 CLASSES = ["plant pot", "sofa", "table", "chair", "cushion", "lamp", "painting", "tea pot", "stool", "clock", "bed", "rug", "shelf", "desk", "cup"]
 BOX_THRESHOLD = 0.35
 TEXT_THRESHOLD = 0.25
 
-print(f"{GREEN_COLOR}GroundingDINO model loaded{END_COLOR}")
+print(f"{GREEN_COLOR}GroundingDINO loaded{END_COLOR}")
 
-# CLIP interrogator configuration
-CAPTION_MODEL_NAME = "blip-large"
-CAPTION_MODEL_PATH = "ViT-L-14/openai"
-config = Config(caption_model_name=CAPTION_MODEL_NAME, clip_model_path=CAPTION_MODEL_PATH, device="cpu")
-config.apply_low_vram_defaults()
-clip_interrogator = Interrogator(config)
+# BLIP Image Captioning Large configuration
+processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
+BLIP_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
 
-print(f"{GREEN_COLOR}CLIP interrogator model loaded{END_COLOR}")
+print(f"{GREEN_COLOR}BLIP Image Captioning Large loaded{END_COLOR}")
 
 app = Flask("DesAIgner's Image and Links API")
 
@@ -65,7 +62,7 @@ def post():
 
 def get_detections(img):
   img_source = np.asarray(img)
-  detections = model.predict_with_classes(img_source, CLASSES, BOX_THRESHOLD, TEXT_THRESHOLD)
+  detections = DINO_model.predict_with_classes(img_source, CLASSES, BOX_THRESHOLD, TEXT_THRESHOLD)
   filter_function = lambda detection: detection["confidence"] > CONFIDENCE_THRESHOLD
   return list(filter(filter_function, parse_detections(detections)))
 
@@ -81,8 +78,12 @@ def parse_detections(detections):
   return output
 
 def get_prompt(img):
-  prompts = clip_interrogator.interrogate(img)
-  return prompts.split(', ')[0]
+  text = "a detailed description of the furniture is a "
+  inputs = processor(img, text, return_tensors="pt")
+
+  out = BLIP_model.generate(**inputs)
+  decoded = processor.decode(out[0], skip_special_tokens=True)
+  return decoded.removeprefix(text)
 
 def area(detection):
   xyxy = detection["box"]
