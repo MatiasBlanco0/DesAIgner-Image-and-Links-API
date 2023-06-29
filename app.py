@@ -69,7 +69,7 @@ def get_detections(img):
 def parse_detections(detections):
   output = []
   for xyxy, confidence in zip(detections.xyxy, detections.confidence):
-    xyxy = list(map(float, xyxy))
+    xyxy = list(map(round, xyxy))
     confidence = float(confidence)
     output.append({
         "xyxy": xyxy,
