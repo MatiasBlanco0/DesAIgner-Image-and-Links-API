@@ -2,6 +2,7 @@ from flask import Flask, request
 from io import BytesIO
 import re
 import base64
+import json
 from PIL import Image
 import numpy as np
 from transformers import BlipProcessor, BlipForConditionalGeneration
@@ -16,7 +17,7 @@ CONFIDENCE_THRESHOLD = 0.5
 MODEL_CONFIG_PATH = "./GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 MODEL_CHECKPOINT_PATH = "./GroundingDINO/weights/groundingdino_swint_ogc.pth"
 DINO_model = Model(MODEL_CONFIG_PATH, MODEL_CHECKPOINT_PATH, "cpu")
-CLASSES = ["plant pot", "sofa", "table", "chair", "cushion", "lamp", "painting", "tea pot", "stool", "clock", "bed", "rug", "shelf", "desk", "cup"]
+CLASSES = json.load(open('furniture_list.json'))
 BOX_THRESHOLD = 0.35
 TEXT_THRESHOLD = 0.25
 
