@@ -3,31 +3,36 @@ from io import BytesIO
 import re
 import base64
 import json
+import requests
 from PIL import Image
 import numpy as np
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from groundingdino.util.inference import Model
 
+TRANSLATE_URL = 'https://clients5.google.com/translate_a/t'
+
 GREEN_COLOR = "\033[92m"
 END_COLOR = "\033[0m"
 
-CONFIDENCE_THRESHOLD = 0.5
+CONFIDENCE_THRESHOLD = 0 # TODO: Set this to a reasonable value
 
 # GroundingDINO configuration
+print(f"{GREEN_COLOR}Loading GroundingDINO...{END_COLOR}")
 MODEL_CONFIG_PATH = "./GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 MODEL_CHECKPOINT_PATH = "./GroundingDINO/weights/groundingdino_swint_ogc.pth"
 DINO_model = Model(MODEL_CONFIG_PATH, MODEL_CHECKPOINT_PATH, "cpu")
 CLASSES = json.load(open('furniture_list.json'))
 BOX_THRESHOLD = 0.35
 TEXT_THRESHOLD = 0.25
-
 print(f"{GREEN_COLOR}GroundingDINO loaded{END_COLOR}")
 
 # BLIP Image Captioning Large configuration
+print(f"{GREEN_COLOR}Loading BLIP Image Captioning Large...{END_COLOR}")
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
 BLIP_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
-
 print(f"{GREEN_COLOR}BLIP Image Captioning Large loaded{END_COLOR}")
+
+print(f"{GREEN_COLOR}Done Loading Models{END_COLOR}")
 
 app = Flask("DesAIgner's Image and Links API")
 
@@ -48,8 +53,13 @@ def post():
 
   for detection in detections:
     im = img.crop(detection["xyxy"])
-    
-    prompts.append(get_prompt(im))
+    prompt_in_english = get_prompt(im)
+    result = requests.get(f'{TRANSLATE_URL}?client=dict-chrome-ex&sl=en&tl=es&q={prompt_in_english}')
+    if (result.status_code != 200):
+      print(f"Translation failed with status code {result.status_code}")
+      return "Translation failed", 500
+    prompt = result.json()[0]
+    prompts.append(prompt)  
 
   output = []
   for detection, prompt in zip(detections, prompts):
