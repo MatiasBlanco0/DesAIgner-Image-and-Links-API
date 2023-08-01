@@ -57,6 +57,7 @@ def post():
     result = requests.get(f'{TRANSLATE_URL}?client=dict-chrome-ex&sl=en&tl=es&q={prompt_in_english}')
     if (result.status_code != 200):
       print(f"Translation failed with status code {result.status_code}")
+      print(result)
       return "Translation failed", 500
     prompt = result.json()[0]
     prompts.append(prompt)  
