@@ -70,6 +70,10 @@ def post():
     prompts.append(prompt)  
 
   links_list = get_links_list(prompts)
+
+  if links_list == "Mercado Libre API failed":
+    return "Mercado Libre API failed", 500
+
   output = []
   for detection, prompt, links in zip(detections, prompts, links_list):
     output.append({
@@ -117,6 +121,12 @@ def get_links_list(prompts):
       'q': prompt
     }
     response = requests.get(f'{MERCADO_LIBRE_URL}/products/search', params, headers=headers)
+
+    if response.status_code != 200:
+      print(f"Mercado Libre API failed with status code {response.status_code}")
+      print(response)
+      return "Mercado Libre API failed"
+
     top3 = response.json()['results'][:3]
     links = [f'{MERCADO_LIBRE_URL}/p/{item["id"]}' for item in top3]
     out.append(links)
