@@ -4,12 +4,19 @@ import re
 import base64
 import json
 import requests
+import os
+from dotenv import load_dotenv
 from PIL import Image
 import numpy as np
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from groundingdino.util.inference import Model
 
+load_dotenv()
+
 TRANSLATE_URL = 'https://clients5.google.com/translate_a/t'
+
+MERCADO_LIBRE_URL = 'https://api.mercadolibre.com/'
+MERCADO_LIBRE_KEY = os.getenv('MERCADO_LIBRE_KEY')
 
 GREEN_COLOR = "\033[92m"
 END_COLOR = "\033[0m"
@@ -62,11 +69,13 @@ def post():
     prompt = result.json()[0]
     prompts.append(prompt)  
 
+  links_list = get_links_list(prompts)
   output = []
-  for detection, prompt in zip(detections, prompts):
+  for detection, prompt, links in zip(detections, prompts, links_list):
     output.append({
       "box": detection["xyxy"],
-      "prompt": prompt
+      "prompt": prompt,
+      "links": links
     })
 
   return sorted(output, key=area)
@@ -96,6 +105,23 @@ def get_prompt(img):
   out = BLIP_model.generate(**inputs)
   decoded = processor.decode(out[0], skip_special_tokens=True)
   return decoded.removeprefix(text)
+
+def get_links_list(prompts):
+  headers = { 'Authorization': f'Bearer {MERCADO_LIBRE_KEY}' }
+  out = []
+
+  for prompt in prompts:
+    params = {
+      'status': 'active',
+      'site_id': 'MLA',
+      'q': prompt
+    }
+    response = requests.get(f'{MERCADO_LIBRE_URL}/products/search', params, headers=headers)
+    top3 = response.json()['results'][:3]
+    links = [f'{MERCADO_LIBRE_URL}/p/{item["id"]}' for item in top3]
+    out.append(links)
+
+  return out
 
 def area(detection):
   xyxy = detection["box"]
