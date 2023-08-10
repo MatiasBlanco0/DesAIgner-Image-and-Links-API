@@ -1,4 +1,5 @@
-from flask import Flask, request
+from fastapi import FastAPI, Response, status, UploadFile
+from pydantic import BaseModel
 from io import BytesIO
 import re
 import base64
@@ -41,15 +42,16 @@ print(f"{GREEN_COLOR}BLIP Image Captioning Large loaded{END_COLOR}")
 
 print(f"{GREEN_COLOR}Done Loading Models{END_COLOR}")
 
-app = Flask("DesAIgner's Image and Links API")
+app = FastAPI(title="DesAIgner's Image and Links API")
 
 @app.post("/")
-def post():
-  data = request.get_data()
-  if not valid_base64_encoded_image(data):
-    return "Input was not a valid base64 string for an image", 400
-  data = base64.b64decode(data.split(b',')[1])
-  img = Image.open(BytesIO(data))
+async def root(image: UploadFile, response: Response):
+  data = image.file.read()
+  # if not valid_base64_encoded_image(data):
+  #   return "Input was not a valid base64 string for an image", 400
+  # data = base64.b64decode(data.split(b',')[1])
+  # img = Image.open(BytesIO(data))
+  # TODO: Convertir los bytes a imagen
 
   if img.mode != 'RGB':
     img.convert('RGB')
@@ -65,14 +67,16 @@ def post():
     if (result.status_code != 200):
       print(f"Translation failed with status code {result.status_code}")
       print(result)
-      return "Translation failed", 500
+      response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+      return "Translation failed"
     prompt = result.json()[0]
     prompts.append(prompt)  
 
   links_list = get_links_list(prompts)
 
   if links_list == "Mercado Libre API failed":
-    return "Mercado Libre API failed", 500
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return "Mercado Libre API failed"
 
   output = []
   for detection, prompt, links in zip(detections, prompts, links_list):
