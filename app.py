@@ -47,11 +47,7 @@ app = FastAPI(title="DesAIgner's Image and Links API")
 @app.post("/")
 async def root(image: UploadFile, response: Response):
   data = image.file.read()
-  # if not valid_base64_encoded_image(data):
-  #   return "Input was not a valid base64 string for an image", 400
-  # data = base64.b64decode(data.split(b',')[1])
-  # img = Image.open(BytesIO(data))
-  # TODO: Convertir los bytes a imagen
+  img = Image.open(BytesIO(data))
 
   if img.mode != 'RGB':
     img.convert('RGB')
