@@ -1,8 +1,7 @@
 from fastapi import FastAPI, Response, status, UploadFile
-from pydantic import BaseModel
+from typing import TypedDict
 from io import BytesIO
 import re
-import base64
 import json
 import requests
 import os
@@ -44,8 +43,13 @@ print(f"{GREEN_COLOR}Done Loading Models{END_COLOR}")
 
 app = FastAPI(title="DesAIgner's Image and Links API")
 
+class Mueble(TypedDict):
+  box: tuple[int, int, int, int]
+  prompt: str
+  links: tuple[str, str, str]
+
 @app.post("/")
-async def root(image: UploadFile, response: Response):
+async def root(image: UploadFile, response: Response) -> list[Mueble]:
   data = image.file.read()
   img = Image.open(BytesIO(data))
 
@@ -76,11 +80,11 @@ async def root(image: UploadFile, response: Response):
 
   output = []
   for detection, prompt, links in zip(detections, prompts, links_list):
-    output.append({
-      "box": detection["xyxy"],
-      "prompt": prompt,
-      "links": links
-    })
+    output.append(Mueble(
+      box=tuple(detection["xyxy"]),
+      prompt=prompt,
+      links=tuple(links)
+    ))
 
   return sorted(output, key=area)
 
