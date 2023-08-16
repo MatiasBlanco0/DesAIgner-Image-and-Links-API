@@ -133,6 +133,8 @@ def get_links_list(prompts):
 
     top3 = response.json()['results'][:3]
     links = [f'{MERCADO_LIBRE_URL}/p/{item["id"]}' for item in top3]
+    while len(links) < 3:
+      links.append("No hay link")
     out.append(links)
 
   return out
