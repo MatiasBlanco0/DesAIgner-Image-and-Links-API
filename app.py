@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Response, status, UploadFile
-from typing import TypedDict
+from typing_extensions import TypedDict
 from io import BytesIO
 import re
 import json
@@ -122,6 +122,7 @@ def get_links_list(prompts):
     params = {
       'status': 'active',
       'site_id': 'MLA',
+      'limit': 3,
       'q': prompt
     }
     response = requests.get(f'{MERCADO_LIBRE_URL}/products/search', params, headers=headers)
@@ -132,7 +133,7 @@ def get_links_list(prompts):
       return "Mercado Libre API failed"
 
     top3 = response.json()['results'][:3]
-    links = [f'{MERCADO_LIBRE_URL}/p/{item["id"]}' for item in top3]
+    links = [f'https://mercadolibre.com.ar/p/{item["id"]}' for item in top3]
     while len(links) < 3:
       links.append("No hay link")
     out.append(links)
