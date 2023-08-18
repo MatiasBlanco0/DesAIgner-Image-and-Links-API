@@ -1,41 +1,56 @@
-from flask import Flask, request
+from fastapi import FastAPI, Response, status, UploadFile
+from typing_extensions import TypedDict
 from io import BytesIO
 import re
-import base64
+import json
+import requests
+import os
+from dotenv import load_dotenv
 from PIL import Image
 import numpy as np
 from transformers import BlipProcessor, BlipForConditionalGeneration
 from groundingdino.util.inference import Model
 
+load_dotenv()
+
+TRANSLATE_URL = 'https://clients5.google.com/translate_a/t'
+
+MERCADO_LIBRE_URL = 'https://api.mercadolibre.com/'
+MERCADO_LIBRE_KEY = os.getenv('MERCADO_LIBRE_KEY')
+
 GREEN_COLOR = "\033[92m"
 END_COLOR = "\033[0m"
 
-CONFIDENCE_THRESHOLD = 0.5
+CONFIDENCE_THRESHOLD = 0 # TODO: Set this to a reasonable value
 
 # GroundingDINO configuration
+print(f"{GREEN_COLOR}Loading GroundingDINO...{END_COLOR}")
 MODEL_CONFIG_PATH = "./GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py"
 MODEL_CHECKPOINT_PATH = "./GroundingDINO/weights/groundingdino_swint_ogc.pth"
 DINO_model = Model(MODEL_CONFIG_PATH, MODEL_CHECKPOINT_PATH, "cpu")
-CLASSES = ["plant pot", "sofa", "table", "chair", "cushion", "lamp", "painting", "tea pot", "stool", "clock", "bed", "rug", "shelf", "desk", "cup"]
+CLASSES = json.load(open('furniture_list.json'))
 BOX_THRESHOLD = 0.35
 TEXT_THRESHOLD = 0.25
-
 print(f"{GREEN_COLOR}GroundingDINO loaded{END_COLOR}")
 
 # BLIP Image Captioning Large configuration
+print(f"{GREEN_COLOR}Loading BLIP Image Captioning Large...{END_COLOR}")
 processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-large")
 BLIP_model = BlipForConditionalGeneration.from_pretrained("Salesforce/blip-image-captioning-large")
-
 print(f"{GREEN_COLOR}BLIP Image Captioning Large loaded{END_COLOR}")
 
-app = Flask("DesAIgner's Image and Links API")
+print(f"{GREEN_COLOR}Done Loading Models{END_COLOR}")
+
+app = FastAPI(title="DesAIgner's Image and Links API")
+
+class Mueble(TypedDict):
+  box: tuple[int, int, int, int]
+  prompt: str
+  links: tuple[str, str, str]
 
 @app.post("/")
-def post():
-  data = request.get_data()
-  if not valid_base64_encoded_image(data):
-    return "Input was not a valid base64 string for an image", 400
-  data = base64.b64decode(data.split(b',')[1])
+async def root(image: UploadFile, response: Response) -> list[Mueble]:
+  data = image.file.read()
   img = Image.open(BytesIO(data))
 
   if img.mode != 'RGB':
@@ -47,15 +62,29 @@ def post():
 
   for detection in detections:
     im = img.crop(detection["xyxy"])
-    
-    prompts.append(get_prompt(im))
+    prompt_in_english = get_prompt(im)
+    result = requests.get(f'{TRANSLATE_URL}?client=dict-chrome-ex&sl=en&tl=es&q={prompt_in_english}')
+    if (result.status_code != 200):
+      print(f"Translation failed with status code {result.status_code}")
+      print(result)
+      response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+      return "Translation failed"
+    prompt = result.json()[0]
+    prompts.append(prompt)  
+
+  links_list = get_links_list(prompts)
+
+  if links_list == "Mercado Libre API failed":
+    response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    return "Mercado Libre API failed"
 
   output = []
-  for detection, prompt in zip(detections, prompts):
-    output.append({
-      "box": detection["xyxy"],
-      "prompt": prompt
-    })
+  for detection, prompt, links in zip(detections, prompts, links_list):
+    output.append(Mueble(
+      box=tuple(detection["xyxy"]),
+      prompt=prompt,
+      links=tuple(links)
+    ))
 
   return sorted(output, key=area)
 
@@ -84,6 +113,32 @@ def get_prompt(img):
   out = BLIP_model.generate(**inputs)
   decoded = processor.decode(out[0], skip_special_tokens=True)
   return decoded.removeprefix(text)
+
+def get_links_list(prompts):
+  headers = { 'Authorization': f'Bearer {MERCADO_LIBRE_KEY}' }
+  out = []
+
+  for prompt in prompts:
+    params = {
+      'status': 'active',
+      'site_id': 'MLA',
+      'limit': 3,
+      'q': prompt
+    }
+    response = requests.get(f'{MERCADO_LIBRE_URL}/products/search', params, headers=headers)
+
+    if response.status_code != 200:
+      print(f"Mercado Libre API failed with status code {response.status_code}")
+      print(response)
+      return "Mercado Libre API failed"
+
+    top3 = response.json()['results'][:3]
+    links = [f'https://mercadolibre.com.ar/p/{item["id"]}' for item in top3]
+    while len(links) < 3:
+      links.append("No hay link")
+    out.append(links)
+
+  return out
 
 def area(detection):
   xyxy = detection["box"]

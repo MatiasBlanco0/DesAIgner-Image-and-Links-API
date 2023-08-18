@@ -5,3 +5,5 @@ GroundingDINO/
 ViT-L-14/
 
 *.jpg
+.env
+test/
