@@ -62,7 +62,10 @@ async def root(image: UploadFile, response: Response) -> list[Mueble]:
 
   for detection in detections:
     im = img.crop(detection["xyxy"])
-    prompt_in_english = get_prompt(im)
+    class_name = 'furniture'
+    if detection['class']:
+      class_name = CLASSES[detection['class']]
+    prompt_in_english = get_prompt(im, class_name)
     result = requests.get(f'{TRANSLATE_URL}?client=dict-chrome-ex&sl=en&tl=es&q={prompt_in_english}')
     if (result.status_code != 200):
       print(f"Translation failed with status code {result.status_code}")
@@ -97,22 +100,24 @@ def get_detections(img):
 
 def parse_detections(detections):
   output = []
-  for xyxy, confidence in zip(detections.xyxy, detections.confidence):
+  for xyxy, confidence, class_id in zip(detections.xyxy, detections.confidence, detections.class_id):
     xyxy = list(map(round, xyxy))
     confidence = float(confidence)
     output.append({
         "xyxy": xyxy,
-        "confidence": confidence
+        "confidence": confidence,
+        "class": class_id
     })
   return output
 
-def get_prompt(img):
-  text = "a detailed description of the furniture is a "
+def get_prompt(img, class_name):
+  text = f"This {class_name} is a "
   inputs = processor(img, text, return_tensors="pt")
 
   out = BLIP_model.generate(**inputs)
   decoded = processor.decode(out[0], skip_special_tokens=True)
-  return decoded.removeprefix(text)
+  prompt = decoded.removeprefix(text)
+  return prompt[0].upper() + prompt[1:]
 
 def get_links_list(prompts):
   headers = { 'Authorization': f'Bearer {MERCADO_LIBRE_KEY}' }
@@ -145,11 +150,3 @@ def area(detection):
   width = xyxy[2] - xyxy[0]
   height = xyxy[1] - xyxy[3]
   return width * height
-
-def valid_base64_encoded_image(image):
-  base64_regex = b'^(?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{4}|[A-Za-z0-9+\/]{3}=|[A-Za-z0-9+\/]{2}={2})$'
-  metadata_regex = b'^data:image/.+;base64$'
-  metadata, data = image.split(b",")
-  base64_match = re.match(base64_regex, data)
-  metadata_match = re.match(metadata_regex, metadata)
-  return metadata_match != None and base64_match != None
