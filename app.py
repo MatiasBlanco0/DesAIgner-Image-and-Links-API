@@ -111,7 +111,7 @@ def parse_detections(detections):
   return output
 
 def get_prompt(img, class_name):
-  text = f"This {class_name} is a "
+  text = "a detailed description of the furniture is a "
   inputs = processor(img, text, return_tensors="pt")
 
   out = BLIP_model.generate(**inputs)
