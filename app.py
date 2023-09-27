@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Response, status, UploadFile
+from fastapi import FastAPI, Response, Request, status, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from typing_extensions import TypedDict
 from io import BytesIO
-import re
 import json
 import requests
+import time
 import os
 from dotenv import load_dotenv
 from PIL import Image
@@ -21,6 +22,7 @@ MERCADO_LIBRE_KEY = os.getenv('MERCADO_LIBRE_KEY')
 GREEN_COLOR = "\033[92m"
 END_COLOR = "\033[0m"
 
+ORIGINS = ["https://desaigner.vercel.app/create"]
 CONFIDENCE_THRESHOLD = 0 # TODO: Set this to a reasonable value
 
 # GroundingDINO configuration
@@ -43,11 +45,29 @@ print(f"{GREEN_COLOR}Done Loading Models{END_COLOR}")
 
 app = FastAPI(title="DesAIgner's Image and Links API")
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"], 
+    allow_credentials=True
+)
+
+@app.middleware("http")
+async def append_process_time_header(request: Request, call_next):
+  start_time = time.now()
+  response = await call_next(request)
+  process_time = time.time() - start_time
+  response.headers["X-Process-Time"] = time.strftime("%M:%S", time.gmtime(process_time))
+  return response
+
 class Mueble(TypedDict):
   box: tuple[int, int, int, int]
   prompt: str
   links: tuple[str, str, str]
 
+# main endpoint
 @app.post("/")
 async def root(image: UploadFile, response: Response) -> list[Mueble]:
   data = image.file.read()
@@ -91,6 +111,11 @@ async def root(image: UploadFile, response: Response) -> list[Mueble]:
 
   return sorted(output, key=area)
 
+# Health check for render.com
+@app.get("/health")
+async def health_check(response: Response):
+  response.status_code = status.HTTP_200_OK
+  return "200 OK"
 
 def get_detections(img):
   img_source = np.asarray(img)
