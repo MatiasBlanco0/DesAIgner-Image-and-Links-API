@@ -1,12 +1,10 @@
-pip install virtualenv
-virtualenv .venv
-source .venv/bin/activate
+pip install pipenv
+pipenv install fastapi python-dotenv transformers numpy python-multipart Pillow typing-extensions uvicorn # API dependencies
 git clone https://github.com/IDEA-Research/GroundingDINO.git
-cd GroundingDINO/
-pip install torch
-pip install -e . # Grounding DINO dependencies
+pipenv install torch
+pipenv install -e ./GroundingDINO # Grounding DINO dependencies
+cd GroundingDINO
 mkdir weights
 cd weights
 wget -q https://github.com/IDEA-Research/GroundingDINO/releases/download/v0.1.0-alpha/groundingdino_swint_ogc.pth
 cd ../..
-pip install fastapi python-dotenv transformers numpy python-multipart Pillow typing-extensions uvicorn # API dependencies

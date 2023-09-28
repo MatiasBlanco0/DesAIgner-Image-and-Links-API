@@ -1,0 +1,21 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+python-dotenv = "*"
+transformers = "*"
+numpy = "*"
+python-multipart = "*"
+pillow = "*"
+typing-extensions = "*"
+uvicorn = "*"
+torch = "*"
+groundingdino = {file = "GroundingDINO", editable = true}
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"
