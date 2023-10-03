@@ -1,18 +1,15 @@
 from fastapi import FastAPI, Response, Request, status, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from typing_extensions import TypedDict
+from groundingdino.util.inference import Model
 from io import BytesIO
 import json
+import numpy as np
+import os
+from PIL import Image
 import requests
 import time
-import os
-from dotenv import load_dotenv
-from PIL import Image
-import numpy as np
 from transformers import BlipProcessor, BlipForConditionalGeneration
-from groundingdino.util.inference import Model
-
-load_dotenv()
+from typing_extensions import TypedDict
 
 TRANSLATE_URL = 'https://clients5.google.com/translate_a/t'
 
